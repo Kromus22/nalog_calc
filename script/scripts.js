@@ -30,6 +30,11 @@ const labelProperty = usn.querySelector('.calc__label_property');
 const resultBlockProperty = usn.querySelector('.result__block_property');
 const taxTotal = usn.querySelector('.result__tax_total');
 const taxProperty = usn.querySelector('.result__tax_property');
+const taxReturn = document.querySelector('.tax-return');
+const formTaxReturn = taxReturn.querySelector('.calc__form');
+const resultTaxNdfl = taxReturn.querySelector('.result__tax_ndfl');
+const resultTaxPussible = taxReturn.querySelector('.result__tax_possible');
+const resultTaxDeduction = taxReturn.querySelector('.result__tax_deduction');
 
 const formatCurrency = (number) => {
   const currency = new Intl.NumberFormat('ru-RU', {
@@ -39,6 +44,40 @@ const formatCurrency = (number) => {
   })
 
   return currency.format(number);
+}
+
+const clear = () => {
+  const resetBtn = document.querySelectorAll('.calc__btn-reset');
+  const inputs = document.querySelectorAll("input[type='number']");
+
+  resetBtn.forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      inputs.forEach((item) => {
+        item.value = '';
+      })
+    });
+  })
+}
+
+clear();
+
+const debounceTimer = (fn, msec) => {
+  let lastCall = 0;
+  let lastCallTimer;
+
+  return (...arg) => {
+    const prevCall = lastCall;
+    lastCall = Date.now;
+
+    if (prevCall && ((lastCall - prevCall) <= msec)) {
+      clearTimeout();
+    }
+
+    lastCallTimer = setTimeout(() => {
+      fn(...arg);
+    }, msec)
+  }
 }
 
 
@@ -62,17 +101,20 @@ for (let i = 0; i < navigationLinks.length; i++) {
 
 calcLabelExpenses.style.display = 'none';
 
-formAusn.addEventListener('input', () => {
+formAusn.addEventListener('input', debounceTimer(() => {
+  const income = +formAusn.income.value;
   if (formAusn.type.value === 'income') {
     calcLabelExpenses.style.display = 'none';
-    resultTaxTotal.textContent = formatCurrency(formAusn.income.value * 0.08);
+    resultTaxTotal.textContent = formatCurrency(income * 0.08);
   }
 
   if (formAusn.type.value === 'expenses') {
     calcLabelExpenses.style.display = '';
-    resultTaxTotal.textContent = formatCurrency((formAusn.income.value - formAusn.expenses.value) * 0.2);
+    const expenses = +formAusn.expenses.value;
+    const profit = income < expenses ? 0 : income - expenses;
+    resultTaxTotal.textContent = formatCurrency(profit * 0.2);
   }
-});
+}, 500));
 
 // Самозянятый калькулятор
 
@@ -88,13 +130,16 @@ const checkCompensation = () => {
 
 checkCompensation();
 
-formSelf.addEventListener('input', () => {
-  const resIndividual = formSelf.individual.value * 0.04;
-  const resEntity = formSelf.entity.value * 0.06;
+formSelf.addEventListener('input', debounceTimer(() => {
+  const individual = +formSelf.individual.value;
+  const entity = +formSelf.entity.value;
+
+  const resIndividual = individual * 0.04;
+  const resEntity = entity * 0.06;
   const tax = resIndividual + resEntity;
-  formSelf.compensation.value = formSelf.compensation.value > 10_000 ? 10_000 : formSelf.compensation.value;
-  const benefit = formSelf.compensation.value;
-  const resBenefit = formSelf.individual.value * 0.01 + formSelf.entity.value * 0.02;
+  formSelf.compensation.value = +formSelf.compensation.value > 10_000 ? 10_000 : formSelf.compensation.value;
+  const benefit = +formSelf.compensation.value;
+  const resBenefit = individual * 0.01 + entity * 0.02;
   const finalBenefit = benefit - resBenefit > 0 ? benefit - resBenefit : 0;
   const finalTax = tax - (benefit - finalBenefit);
 
@@ -105,7 +150,7 @@ formSelf.addEventListener('input', () => {
   resultTaxCompensation.textContent = formatCurrency(benefit - finalBenefit);
   resultTaxRestCompensation.textContent = formatCurrency(finalBenefit);
   resultTaxResult.textContent = formatCurrency(finalTax);
-});
+}, 500));
 
 // ОСНО калькулятор
 
@@ -125,16 +170,16 @@ const checkFormBusiness = () => {
 
 checkFormBusiness();
 
-formOsno.addEventListener('input', () => {
+formOsno.addEventListener('input', debounceTimer(() => {
   checkFormBusiness();
 
-  const income = formOsno.income.value;
-  const expenses = formOsno.expenses.value;
-  const property = formOsno.property.value;
+  const income = +formOsno.income.value;
+  const expenses = +formOsno.expenses.value;
+  const property = +formOsno.property.value;
 
   const nds = income * 0.2;
   const taxProperty = property * 0.02;
-  const profit = income - expenses;
+  const profit = income < expenses ? 0 : income - expenses;
   const ndflExpensesTotal = profit * 0.13;
   const ndflIncomeTotal = (income - nds) * 0.13;
   const taxProfit = profit * 0.2;
@@ -144,7 +189,7 @@ formOsno.addEventListener('input', () => {
   resultTaxNdflExpenses.textContent = formatCurrency(ndflExpensesTotal);
   resultTaxNdflIncome.textContent = formatCurrency(ndflIncomeTotal);
   resultTaxProfit.textContent = formatCurrency(taxProfit);
-})
+}, 500))
 
 // УСН калькулятор
 
@@ -185,13 +230,13 @@ const percent = {
   'ooo-expenses': 0.15,
 }
 
-formUsn.addEventListener('input', () => {
+formUsn.addEventListener('input', debounceTimer(() => {
   checkShowProperty(formUsn.typeTax.value);
 
-  const income = formUsn.income.value;
-  const expenses = formUsn.expenses.value;
-  const contributions = formUsn.contributions.value;
-  const property = formUsn.property.value;
+  const income = +formUsn.income.value;
+  const expenses = +formUsn.expenses.value;
+  const contributions = +formUsn.contributions.value;
+  const property = +formUsn.property.value;
 
   let profit = income - contributions;
 
@@ -204,6 +249,22 @@ formUsn.addEventListener('input', () => {
   const tax = summ * percent[formUsn.typeTax.value];
   const resultTaxProperty = property * 0.02;
 
-  taxTotal.textContent = formatCurrency(tax);
+  taxTotal.textContent = formatCurrency(tax < 0 ? 0 : tax);
   taxProperty.textContent = formatCurrency(resultTaxProperty);
-});
+}, 500));
+
+// 13 %
+
+formTaxReturn.addEventListener('input', debounceTimer(() => {
+  const expenses = +formTaxReturn.expenses.value;
+  const income = +formTaxReturn.income.value;
+  const sumExpenses = +formTaxReturn.sumExpenses.value;
+
+  const ndfl = income * 0.13;
+  const possibleDeduction = expenses < sumExpenses ? expenses * 0.13 : sumExpenses * 0.13;
+  const deduction = possibleDeduction < ndfl ? possibleDeduction : ndfl;
+
+  resultTaxNdfl.textContent = formatCurrency(ndfl);
+  resultTaxPussible.textContent = formatCurrency(possibleDeduction);
+  resultTaxDeduction.textContent = formatCurrency(deduction);
+}, 500));
